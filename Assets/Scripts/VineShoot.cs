@@ -1,19 +1,25 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class VineShoot : MonoBehaviour
 {
     public GameObject vineObject;
-
+    InputAction attack;
 
     void Start()
     {
-        Shoot(transform.position, transform.forward);
-    }
+		attack = InputSystem.actions.FindAction("Attack");
+        attack.Enable();
+		//Shoot(transform.position, transform.forward);
+	}
 
     void Update()
     {
-        
-    }
+        if(attack.WasPerformedThisFrame())
+        {
+			Shoot(transform.position, transform.forward);
+		}
+	}
 
     void Shoot(Vector3 pos, Vector3 dir)
     {
