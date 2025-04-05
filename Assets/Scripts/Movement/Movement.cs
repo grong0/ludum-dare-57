@@ -3,30 +3,41 @@ using System.Collections;
 using UnityEngine.InputSystem;
 using Unity.VisualScripting;
 using Unity.VisualScripting.FullSerializer;
+using UnityEngine.Analytics;
 
 public class Movement : MonoBehaviour
 {
 	InputAction look;
 	InputAction move;
 	InputAction jump;
+	InputAction crouch;
 	Transform camera;
+	Rigidbody rb;
+	bool sliding = false;
+	float timeLeftTillEndOfSlide = 0f;
 	public float angleLimit = 80;
-	public float speed = 10;
-	public float jumpStrength = 10;
+	public float speed = 8;
+	public float jumpStrength = 200;
+	public float lerpSmoothness = 6f;
+	public float slideStrength = 200;
+	public float slideDuration = 1f;
 
 	// Start is called once before the first execution of Update after the MonoBehaviour is created
 	void Start()
 	{
 		look = InputSystem.actions.FindAction("Look");
-		move = InputSystem.actions.FindAction("Move");
-		jump = InputSystem.actions.FindAction("Jump");
 		look.Enable();
+		move = InputSystem.actions.FindAction("Move");
 		move.Enable();
+		jump = InputSystem.actions.FindAction("Jump");
 		jump.Enable();
+		crouch = InputSystem.actions.FindAction("Crouch");
+		crouch.Enable();
 
 		camera = transform.GetChild(0);
-
 		camera.rotation.eulerAngles.Set(0, 0, 0);
+
+		rb = GetComponent<Rigidbody>();
 	}
 
 	// Update is called once per frame
@@ -68,17 +79,42 @@ public class Movement : MonoBehaviour
 			transform.rotation *= Quaternion.Euler(0, mousePositionDelta.x, 0);
 		}
 
+		// restrict movement durring slide
+		if (sliding)
+		{
+			timeLeftTillEndOfSlide -= Time.deltaTime;
+			if (timeLeftTillEndOfSlide < 0)
+			{
+				timeLeftTillEndOfSlide = 0;
+				// Stop the slide
+			}
+			else
+			{
+				return;
+			}
+		}
+
 		// moving
 		Vector2 movePositionDelta = move.ReadValue<Vector2>();
-		print(movePositionDelta);
-		transform.position += transform.forward * movePositionDelta.y * Time.deltaTime * speed;
-		transform.position += transform.right * movePositionDelta.x * Time.deltaTime * speed;
+		Vector3 xVelocity = transform.forward * movePositionDelta.y * speed;
+		Vector3 zVelocity = transform.right * movePositionDelta.x * speed;
+		Vector3 destinationVector = new Vector3(0, rb.linearVelocity.y, 0) + xVelocity + zVelocity;
+		float lerpValue = lerpSmoothness * (movePositionDelta.sqrMagnitude > 0 ? 1 : 1) * Time.deltaTime;
+		rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, destinationVector, lerpValue);
 
 		// jumping
 		if (jump.WasPerformedThisFrame())
 		{
-			// transform.position += transform.up * jumpStrength;
-			Rigidbody.
+			rb.AddForce(new Vector3(0, jumpStrength, 0));
+		}
+
+		// sliding
+		if (crouch.WasPerformedThisFrame() && movePositionDelta.sqrMagnitude != 0 && !sliding)
+		{
+			sliding = true;
+			timeLeftTillEndOfSlide = slideDuration;
+			// rb.AddForce(rb.linearVelocity * slideStrength);
+			// Start the slide
 		}
 	}
 }
