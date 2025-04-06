@@ -1,10 +1,5 @@
 using UnityEngine;
-using System.Collections;
 using UnityEngine.InputSystem;
-using Unity.VisualScripting;
-using Unity.VisualScripting.FullSerializer;
-using UnityEngine.Analytics;
-
 public class Movement : MonoBehaviour
 {
 	InputAction look;
@@ -122,12 +117,10 @@ public class Movement : MonoBehaviour
 			}
 		}
 
-		print("current speed: " + rb.linearVelocity.sqrMagnitude);
 		Vector2 movePositionDelta = move.ReadValue<Vector2>();
 
 		// field of view warping
 		float fieldOfViewMod = 1 + (sliding ? slideFieldOfViewMod : 0) + (sprinting ? sprintFieldOfViewMod : 0);
-		print(fieldOfViewMod);
 		mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView * fieldOfViewMod, fieldOfViewSmoothness * Time.deltaTime);
 
 		// sliding
@@ -177,32 +170,26 @@ public class Movement : MonoBehaviour
 
 	void OnCollisionExit(Collision collision)
 	{
-		print("left a collision");
 		foreach (ContactPoint contact in collision.contacts)
 		{
 			if (contact.normal.y >= floorThreshold)
 			{
-				print("found contact that is valid, on the ground");
 				return;
 			}
 		}
-		print("no valid contact was found, in the air");
 		onGround = false;
 	}
 
 	void OnCollisionStay(Collision collision)
 	{
-		print("has a collision");
 		foreach (ContactPoint contact in collision.contacts)
 		{
 			if (contact.normal.y >= floorThreshold)
 			{
-				print("found contact that is valid, on the ground");
 				onGround = true;
 				return;
 			}
 		}
-		print("no valid contact was found, in the air");
 		onGround = false;
 	}
 }
