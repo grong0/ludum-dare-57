@@ -11,6 +11,7 @@ public class Movement : MonoBehaviour
 	InputAction move;
 	InputAction jump;
 	InputAction crouch;
+	InputAction sprint;
 	Transform cameraTransform;
 	Camera mainCamera;
 	Rigidbody rb;
@@ -20,6 +21,7 @@ public class Movement : MonoBehaviour
 	bool onGround = true;
 	Vector3 cameraStandPosition;
 	Vector3 cameraSlidePosition;
+	bool sprinting = false;
 	public float angleLimit = 80;
 	public float speed = 8;
 	public float jumpStrength = 250;
@@ -32,6 +34,10 @@ public class Movement : MonoBehaviour
 	public int baseFieldOfView = 100;
 	public float fieldOfViewMod = 1.1f;
 	public float slideSpeedMod = 1.2f;
+	public float slideFieldOfViewMod = 0.2f;
+	public float sprintSpeedMod = 1.2f;
+	public float sprintFieldOfViewMod = 0.2f;
+	public float fieldOfViewSmoothness = 6f;
 
 	// Start is called once before the first execution of Update after the MonoBehaviour is created
 	void Start()
@@ -44,6 +50,8 @@ public class Movement : MonoBehaviour
 		jump.Enable();
 		crouch = InputSystem.actions.FindAction("Crouch");
 		crouch.Enable();
+		sprint = InputSystem.actions.FindAction("Sprint");
+		sprint.Enable();
 
 		cameraTransform = transform.GetChild(0);
 		cameraTransform.rotation.eulerAngles.Set(0, 0, 0);
@@ -114,8 +122,30 @@ public class Movement : MonoBehaviour
 			}
 		}
 
-		print(rb.linearVelocity.sqrMagnitude);
+		print("current speed: " + rb.linearVelocity.sqrMagnitude);
+		Vector2 movePositionDelta = move.ReadValue<Vector2>();
 
+		// field of view warping
+		float fieldOfViewMod = 1 + (sliding ? slideFieldOfViewMod : 0) + (sprinting ? sprintFieldOfViewMod : 0);
+		print(fieldOfViewMod);
+		mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView * fieldOfViewMod, fieldOfViewSmoothness * Time.deltaTime);
+
+		// sliding
+		if (crouch.WasPerformedThisFrame())
+		{
+			if (!sliding && movePositionDelta.sqrMagnitude != 0)
+			{
+				sliding = true;
+				timeLeftTillEndOfSlide = slideDuration;
+				Vector3 xSlideVelocity = transform.forward * movePositionDelta.y * speed * slideSpeedMod;
+				Vector3 zSlideVelocity = transform.right * movePositionDelta.x * speed * slideSpeedMod;
+				rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0) + xSlideVelocity + zSlideVelocity;
+			}
+			else if (sliding && onGround)
+			{
+				sliding = false;
+			}
+		}
 		// restrict movement durring slide
 		if (sliding)
 		{
@@ -129,31 +159,20 @@ public class Movement : MonoBehaviour
 				}
 			}
 			cameraTransform.transform.localPosition = Vector3.Lerp(cameraTransform.transform.localPosition, cameraSlidePosition, cameraSwitchSpeed * Time.deltaTime);
-			mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView * fieldOfViewMod, cameraSwitchSpeed * Time.deltaTime);
 			return;
 		} else if (cameraTransform.transform.localPosition != cameraStandPosition) // TODO: snap to position when close enough beauces it will never get there
 		{
 			cameraTransform.transform.localPosition = Vector3.Lerp(cameraTransform.transform.localPosition, cameraStandPosition, cameraSwitchSpeed * Time.deltaTime);
-			mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView, cameraSwitchSpeed * Time.deltaTime);
 		}
 
+		// sprint check
+		sprinting = sprint.IsPressed() && !sliding && movePositionDelta.sqrMagnitude != 0;
 		// moving
-		Vector2 movePositionDelta = move.ReadValue<Vector2>();
-		Vector3 xVelocity = transform.forward * movePositionDelta.y * speed;
-		Vector3 zVelocity = transform.right * movePositionDelta.x * speed;
+		Vector3 xVelocity = transform.forward * movePositionDelta.y * speed * (sprinting ? sprintSpeedMod : 1);
+		Vector3 zVelocity = transform.right * movePositionDelta.x * speed * (sprinting ? sprintSpeedMod : 1);
 		Vector3 destinationVector = new Vector3(0, rb.linearVelocity.y, 0) + xVelocity + zVelocity;
 		float lerpValue = lerpSmoothness * Time.deltaTime * (!onGround ? 0.1f : 1);
 		rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, destinationVector, lerpValue);
-
-		// sliding
-		if (crouch.WasPerformedThisFrame() && movePositionDelta.sqrMagnitude != 0 && !sliding)
-		{
-			sliding = true;
-			timeLeftTillEndOfSlide = slideDuration;
-			Vector3 xSlideVelocity = transform.forward * movePositionDelta.y * speed * slideSpeedMod;
-			Vector3 zSlideVelocity = transform.right * movePositionDelta.x * speed * slideSpeedMod;
-			rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0) + xSlideVelocity + zSlideVelocity;
-		}
 	}
 
 	void OnCollisionExit(Collision collision)
