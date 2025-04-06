@@ -4,6 +4,10 @@ using UnityEngine.InputSystem;
 public class VineShoot : MonoBehaviour
 {
     public GameObject vineObject;
+    public GameObject leaf;
+
+
+
     InputAction attack;
 
     void Start()
@@ -26,7 +30,9 @@ public class VineShoot : MonoBehaviour
 		RaycastHit hitInfo;
 		if(Physics.Raycast(pos, dir, out hitInfo))
         {
-            Instantiate(vineObject, hitInfo.point, Quaternion.LookRotation(hitInfo.normal, Vector3.up));
+            VineGeneration vineGenerator = Instantiate(vineObject, hitInfo.point, Quaternion.LookRotation(hitInfo.normal, Vector3.up)).GetComponent<VineGeneration>();
+            vineGenerator.leaf = leaf;
+            vineGenerator.Generate();
         }
     }
 }
