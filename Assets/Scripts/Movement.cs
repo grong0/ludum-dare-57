@@ -1,10 +1,5 @@
 using UnityEngine;
-using System.Collections;
 using UnityEngine.InputSystem;
-using Unity.VisualScripting;
-using Unity.VisualScripting.FullSerializer;
-using UnityEngine.Analytics;
-
 public class Movement : MonoBehaviour
 {
 	InputAction look;
@@ -66,41 +61,39 @@ public class Movement : MonoBehaviour
 		mainCamera.fieldOfView = baseFieldOfView;
 
 		rb = GetComponent<Rigidbody>();
-
-		print("huh");
 	}
 
 	// Update is called once per frame
 	void Update()
 	{
-		if (look.WasPerformedThisFrame())
+		if(look.WasPerformedThisFrame())
 		{
 			Vector2 mousePositionDelta = look.ReadValue<Vector2>();
 			float delta = mousePositionDelta.y;
-			if (mousePositionDelta.y > 0)
+			if(mousePositionDelta.y > 0)
 			{
 				// looking up and in the top half
 				float distanceToMax = cameraTransform.rotation.eulerAngles.x - (360 - angleLimit);
-				if (cameraTransform.rotation.eulerAngles.x <= angleLimit + 1)
+				if(cameraTransform.rotation.eulerAngles.x <= angleLimit + 1)
 				{
 					distanceToMax = cameraTransform.rotation.eulerAngles.x + angleLimit;
 				}
 
-				if (delta > distanceToMax)
+				if(delta > distanceToMax)
 				{
 					delta = distanceToMax;
 				}
 			}
-			else if (mousePositionDelta.y < 0)
+			else if(mousePositionDelta.y < 0)
 			{
 				// looking down and in the bottom half
 				float distanceToMax = angleLimit - cameraTransform.rotation.eulerAngles.x;
-				if (cameraTransform.rotation.eulerAngles.x >= 359 - angleLimit)
+				if(cameraTransform.rotation.eulerAngles.x >= 359 - angleLimit)
 				{
 					distanceToMax = cameraTransform.rotation.eulerAngles.x - (360 - angleLimit) + angleLimit;
 				}
 
-				if (-1 * delta > distanceToMax)
+				if(-1 * delta > distanceToMax)
 				{
 					delta = distanceToMax * -1;
 				}
@@ -110,9 +103,9 @@ public class Movement : MonoBehaviour
 		}
 
 		// jumping (have jump cancel sliding)
-		if (jump.WasPerformedThisFrame() && onGround)
+		if(jump.WasPerformedThisFrame() && onGround)
 		{
-			if (sliding)
+			if(sliding)
 			{
 				sliding = false;
 				timeLeftTillEndOfSlide = 0;
@@ -123,21 +116,17 @@ public class Movement : MonoBehaviour
 				rb.AddForce(new Vector3(0, jumpStrength, 0));
 			}
 		}
-		print(rb);
-		print(rb.linearVelocity);
-		print(rb.linearVelocity.sqrMagnitude);
-		print("current speed: " + rb.linearVelocity.sqrMagnitude);
+
 		Vector2 movePositionDelta = move.ReadValue<Vector2>();
 
 		// field of view warping
 		float fieldOfViewMod = 1 + (sliding ? slideFieldOfViewMod : 0) + (sprinting ? sprintFieldOfViewMod : 0);
-		print(fieldOfViewMod);
 		mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView * fieldOfViewMod, fieldOfViewSmoothness * Time.deltaTime);
 
 		// sliding
-		if (crouch.WasPerformedThisFrame())
+		if(crouch.WasPerformedThisFrame())
 		{
-			if (!sliding && movePositionDelta.sqrMagnitude != 0)
+			if(!sliding && movePositionDelta.sqrMagnitude != 0)
 			{
 				sliding = true;
 				timeLeftTillEndOfSlide = slideDuration;
@@ -145,18 +134,18 @@ public class Movement : MonoBehaviour
 				Vector3 zSlideVelocity = transform.right * movePositionDelta.x * speed * slideSpeedMod;
 				rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0) + xSlideVelocity + zSlideVelocity;
 			}
-			else if (sliding && onGround)
+			else if(sliding && onGround)
 			{
 				sliding = false;
 			}
 		}
 		// restrict movement durring slide
-		if (sliding)
+		if(sliding)
 		{
-			if (onGround)
+			if(onGround)
 			{
 				timeLeftTillEndOfSlide -= Time.deltaTime;
-				if (timeLeftTillEndOfSlide < 0)
+				if(timeLeftTillEndOfSlide < 0)
 				{
 					timeLeftTillEndOfSlide = 0;
 					sliding = false;
@@ -164,7 +153,8 @@ public class Movement : MonoBehaviour
 			}
 			cameraTransform.transform.localPosition = Vector3.Lerp(cameraTransform.transform.localPosition, cameraSlidePosition, cameraSwitchSpeed * Time.deltaTime);
 			return;
-		} else if (cameraTransform.transform.localPosition != cameraStandPosition) // TODO: snap to position when close enough beauces it will never get there
+		}
+		else if(cameraTransform.transform.localPosition != cameraStandPosition) // TODO: snap to position when close enough beauces it will never get there
 		{
 			cameraTransform.transform.localPosition = Vector3.Lerp(cameraTransform.transform.localPosition, cameraStandPosition, cameraSwitchSpeed * Time.deltaTime);
 		}
@@ -181,32 +171,26 @@ public class Movement : MonoBehaviour
 
 	void OnCollisionExit(Collision collision)
 	{
-		print("left a collision");
-		foreach (ContactPoint contact in collision.contacts)
+		foreach(ContactPoint contact in collision.contacts)
 		{
-			if (contact.normal.y >= floorThreshold)
+			if(contact.normal.y >= floorThreshold)
 			{
-				print("found contact that is valid, on the ground");
 				return;
 			}
 		}
-		print("no valid contact was found, in the air");
 		onGround = false;
 	}
 
 	void OnCollisionStay(Collision collision)
 	{
-		print("has a collision");
-		foreach (ContactPoint contact in collision.contacts)
+		foreach(ContactPoint contact in collision.contacts)
 		{
-			if (contact.normal.y >= floorThreshold)
+			if(contact.normal.y >= floorThreshold)
 			{
-				print("found contact that is valid, on the ground");
 				onGround = true;
 				return;
 			}
 		}
-		print("no valid contact was found, in the air");
 		onGround = false;
 	}
 }
