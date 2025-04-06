@@ -66,6 +66,8 @@ public class Movement : MonoBehaviour
 		mainCamera.fieldOfView = baseFieldOfView;
 
 		rb = GetComponent<Rigidbody>();
+
+		print("huh");
 	}
 
 	// Update is called once per frame
@@ -121,7 +123,9 @@ public class Movement : MonoBehaviour
 				rb.AddForce(new Vector3(0, jumpStrength, 0));
 			}
 		}
-
+		print(rb);
+		print(rb.linearVelocity);
+		print(rb.linearVelocity.sqrMagnitude);
 		print("current speed: " + rb.linearVelocity.sqrMagnitude);
 		Vector2 movePositionDelta = move.ReadValue<Vector2>();
 

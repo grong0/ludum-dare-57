@@ -13,7 +13,7 @@ public class VineGeneration : MonoBehaviour
     float startSize = 0.1f;
 	float endSize = .025f;
 	float segLength = .1f;
-    float range = 2;
+    float range = 5;
 	float zFightOffset = 0.001f;
     int tendrilCount = 7;
 	float leafSpacing = 0.08f;
@@ -23,7 +23,7 @@ public class VineGeneration : MonoBehaviour
 	float animationLength = 1;
 
 	int randomDeg = 20;
-	float splitFactor = 0.01f;
+	float splitFactor = 0.03f;
 	bool random = true;
 
 	//Calculated values;
@@ -37,6 +37,7 @@ public class VineGeneration : MonoBehaviour
 
 	public void Generate()
 	{
+
 		leafChild = transform.GetChild(0);
 		rootNormal = transform.forward;
 		rootBaselineTangent = transform.up;
