@@ -11,16 +11,27 @@ public class Movement : MonoBehaviour
 	InputAction move;
 	InputAction jump;
 	InputAction crouch;
-	Transform camera;
+	Transform cameraTransform;
+	Camera mainCamera;
 	Rigidbody rb;
 	bool sliding = false;
 	float timeLeftTillEndOfSlide = 0f;
+	Vector3 initialSlideVector;
+	bool onGround = true;
+	Vector3 cameraStandPosition;
+	Vector3 cameraSlidePosition;
 	public float angleLimit = 80;
 	public float speed = 8;
-	public float jumpStrength = 200;
+	public float jumpStrength = 250;
 	public float lerpSmoothness = 6f;
 	public float slideStrength = 200;
-	public float slideDuration = 1f;
+	public float slideJumpStrength = 1.2f;
+	public float slideDuration = 0.75f;
+	public float floorThreshold = 0.70f;
+	public float cameraSwitchSpeed = 6f;
+	public int baseFieldOfView = 100;
+	public float fieldOfViewMod = 1.1f;
+	public float slideSpeedMod = 1.2f;
 
 	// Start is called once before the first execution of Update after the MonoBehaviour is created
 	void Start()
@@ -34,8 +45,17 @@ public class Movement : MonoBehaviour
 		crouch = InputSystem.actions.FindAction("Crouch");
 		crouch.Enable();
 
-		camera = transform.GetChild(0);
-		camera.rotation.eulerAngles.Set(0, 0, 0);
+		cameraTransform = transform.GetChild(0);
+		cameraTransform.rotation.eulerAngles.Set(0, 0, 0);
+		cameraStandPosition = cameraTransform.localPosition;
+		cameraSlidePosition = new Vector3(
+			cameraTransform.transform.localPosition.x,
+			cameraTransform.transform.localPosition.y - 0.5f,
+			cameraTransform.transform.localPosition.z
+		);
+
+		mainCamera = Camera.main;
+		mainCamera.fieldOfView = baseFieldOfView;
 
 		rb = GetComponent<Rigidbody>();
 	}
@@ -50,10 +70,10 @@ public class Movement : MonoBehaviour
 			if (mousePositionDelta.y > 0)
 			{
 				// looking up and in the top half
-				float distanceToMax = camera.rotation.eulerAngles.x - (360 - angleLimit);
-				if (camera.rotation.eulerAngles.x <= angleLimit + 1)
+				float distanceToMax = cameraTransform.rotation.eulerAngles.x - (360 - angleLimit);
+				if (cameraTransform.rotation.eulerAngles.x <= angleLimit + 1)
 				{
-					distanceToMax = camera.rotation.eulerAngles.x + angleLimit;
+					distanceToMax = cameraTransform.rotation.eulerAngles.x + angleLimit;
 				}
 
 				if (delta > distanceToMax)
@@ -64,10 +84,10 @@ public class Movement : MonoBehaviour
 			else if (mousePositionDelta.y < 0)
 			{
 				// looking down and in the bottom half
-				float distanceToMax = angleLimit - camera.rotation.eulerAngles.x;
-				if (camera.rotation.eulerAngles.x >= 359 - angleLimit)
+				float distanceToMax = angleLimit - cameraTransform.rotation.eulerAngles.x;
+				if (cameraTransform.rotation.eulerAngles.x >= 359 - angleLimit)
 				{
-					distanceToMax = camera.rotation.eulerAngles.x - (360 - angleLimit) + angleLimit;
+					distanceToMax = cameraTransform.rotation.eulerAngles.x - (360 - angleLimit) + angleLimit;
 				}
 
 				if (-1 * delta > distanceToMax)
@@ -75,23 +95,46 @@ public class Movement : MonoBehaviour
 					delta = distanceToMax * -1;
 				}
 			}
-			camera.localRotation *= Quaternion.Euler(-delta, 0, 0);
+			cameraTransform.localRotation *= Quaternion.Euler(-delta, 0, 0);
 			transform.rotation *= Quaternion.Euler(0, mousePositionDelta.x, 0);
 		}
+
+		// jumping (have jump cancel sliding)
+		if (jump.WasPerformedThisFrame() && onGround)
+		{
+			if (sliding)
+			{
+				sliding = false;
+				timeLeftTillEndOfSlide = 0;
+				rb.AddForce(new Vector3(0, jumpStrength * slideJumpStrength, 0));
+			}
+			else
+			{
+				rb.AddForce(new Vector3(0, jumpStrength, 0));
+			}
+		}
+
+		print(rb.linearVelocity.sqrMagnitude);
 
 		// restrict movement durring slide
 		if (sliding)
 		{
-			timeLeftTillEndOfSlide -= Time.deltaTime;
-			if (timeLeftTillEndOfSlide < 0)
+			if (onGround)
 			{
-				timeLeftTillEndOfSlide = 0;
-				// Stop the slide
+				timeLeftTillEndOfSlide -= Time.deltaTime;
+				if (timeLeftTillEndOfSlide < 0)
+				{
+					timeLeftTillEndOfSlide = 0;
+					sliding = false;
+				}
 			}
-			else
-			{
-				return;
-			}
+			cameraTransform.transform.localPosition = Vector3.Lerp(cameraTransform.transform.localPosition, cameraSlidePosition, cameraSwitchSpeed * Time.deltaTime);
+			mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView * fieldOfViewMod, cameraSwitchSpeed * Time.deltaTime);
+			return;
+		} else if (cameraTransform.transform.localPosition != cameraStandPosition) // TODO: snap to position when close enough beauces it will never get there
+		{
+			cameraTransform.transform.localPosition = Vector3.Lerp(cameraTransform.transform.localPosition, cameraStandPosition, cameraSwitchSpeed * Time.deltaTime);
+			mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, baseFieldOfView, cameraSwitchSpeed * Time.deltaTime);
 		}
 
 		// moving
@@ -99,22 +142,48 @@ public class Movement : MonoBehaviour
 		Vector3 xVelocity = transform.forward * movePositionDelta.y * speed;
 		Vector3 zVelocity = transform.right * movePositionDelta.x * speed;
 		Vector3 destinationVector = new Vector3(0, rb.linearVelocity.y, 0) + xVelocity + zVelocity;
-		float lerpValue = lerpSmoothness * (movePositionDelta.sqrMagnitude > 0 ? 1 : 1) * Time.deltaTime;
+		float lerpValue = lerpSmoothness * Time.deltaTime * (!onGround ? 0.1f : 1);
 		rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, destinationVector, lerpValue);
-
-		// jumping
-		if (jump.WasPerformedThisFrame())
-		{
-			rb.AddForce(new Vector3(0, jumpStrength, 0));
-		}
 
 		// sliding
 		if (crouch.WasPerformedThisFrame() && movePositionDelta.sqrMagnitude != 0 && !sliding)
 		{
 			sliding = true;
 			timeLeftTillEndOfSlide = slideDuration;
-			// rb.AddForce(rb.linearVelocity * slideStrength);
-			// Start the slide
+			Vector3 xSlideVelocity = transform.forward * movePositionDelta.y * speed * slideSpeedMod;
+			Vector3 zSlideVelocity = transform.right * movePositionDelta.x * speed * slideSpeedMod;
+			rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0) + xSlideVelocity + zSlideVelocity;
 		}
+	}
+
+	void OnCollisionExit(Collision collision)
+	{
+		print("left a collision");
+		foreach (ContactPoint contact in collision.contacts)
+		{
+			if (contact.normal.y >= floorThreshold)
+			{
+				print("found contact that is valid, on the ground");
+				return;
+			}
+		}
+		print("no valid contact was found, in the air");
+		onGround = false;
+	}
+
+	void OnCollisionStay(Collision collision)
+	{
+		print("has a collision");
+		foreach (ContactPoint contact in collision.contacts)
+		{
+			if (contact.normal.y >= floorThreshold)
+			{
+				print("found contact that is valid, on the ground");
+				onGround = true;
+				return;
+			}
+		}
+		print("no valid contact was found, in the air");
+		onGround = false;
 	}
 }
